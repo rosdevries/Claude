@@ -277,26 +277,17 @@ def _fetch_yf_screener(
     pct_change_min: float, min_volume: int,
     mktcap_min: int, mktcap_max: int,
 ) -> list:
+    from yfinance import EquityQuery
     import yfinance as yf
-    screener = yf.Screener()
-    screener.set_body({
-        "offset": 0,
-        "size": 250,
-        "sortField": "dayvolume",
-        "sortType": "desc",
-        "quoteType": "EQUITY",
-        "query": {
-            "operator": "and",
-            "operands": [
-                {"operator": "eq",   "operands": ["region", "us"]},
-                {"operator": "btwn", "operands": ["intradaymarketcap", mktcap_min, mktcap_max]},
-                {"operator": "btwn", "operands": ["lastsaleprice", price_min, price_max]},
-                {"operator": "gt",   "operands": ["dayvolume", min_volume]},
-                {"operator": "gt",   "operands": ["percentchange", pct_change_min * 100]},
-            ],
-        },
-    })
-    return screener.response.get("quotes", [])
+    q = EquityQuery('and', [
+        EquityQuery('eq',   ['region', 'us']),
+        EquityQuery('btwn', ['intradaymarketcap', mktcap_min, mktcap_max]),
+        EquityQuery('btwn', ['intradayprice',     price_min,  price_max]),
+        EquityQuery('gt',   ['dayvolume',         min_volume]),
+        EquityQuery('gt',   ['percentchange',     pct_change_min * 100]),
+    ])
+    result = yf.screen(q, sortField='dayvolume', sortAsc=False)
+    return result.get('quotes', [])
 
 
 def run_pipeline_yf(strategy: dict) -> tuple:
@@ -321,19 +312,19 @@ def run_pipeline_yf(strategy: dict) -> tuple:
     for q in quotes:
         try:
             sym        = q.get("symbol", "")
-            price      = q.get("regularMarketPrice") or q.get("lastSalePrice")
+            price      = q.get("regularMarketPrice")
             prev_close = q.get("regularMarketPreviousClose")
-            volume     = q.get("regularMarketVolume") or q.get("dayVolume", 0)
+            volume     = q.get("regularMarketVolume", 0)
             mktcap     = q.get("marketCap", 0)
+            pct        = q.get("regularMarketChangePercent", 0)  # already in %, e.g. 15.5
             if not sym or not price or not prev_close:
                 continue
-            pct  = (price - prev_close) / prev_close
             vwap = compute_vwap(intraday_bars.get(sym))
             rows.append({
                 "Symbol":     sym,
                 "Prev Close": round(prev_close, 2),
                 "Last Price": round(price, 2),
-                "% Change":   round(pct * 100, 2),
+                "% Change":   round(pct, 2),
                 "Volume":     int(volume),
                 rvol_col:     None,
                 "VWAP":       round(vwap, 2) if vwap is not None else None,
