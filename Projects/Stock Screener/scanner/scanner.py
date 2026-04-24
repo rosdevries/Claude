@@ -306,7 +306,8 @@ def run_pipeline(strategy: dict) -> tuple:
         if d_df is None or d_df.empty:
             continue
         rvol = compute_relative_volume(d_df, volume, strategy)
-        if rvol is None or rvol < strategy["rvol_min"]:
+        rvol_min = strategy["rvol_min"]
+        if rvol_min is not None and (rvol is None or rvol < rvol_min):
             continue
 
         vwap = compute_vwap(intraday_bars.get(sym))
@@ -315,6 +316,9 @@ def run_pipeline(strategy: dict) -> tuple:
 
         mktcap = market_caps.get(sym, 0.0)
         if mktcap < strategy["mktcap_min"]:
+            continue
+        mktcap_max = strategy.get("mktcap_max")
+        if mktcap_max is not None and mktcap > mktcap_max:
             continue
 
         rows.append({

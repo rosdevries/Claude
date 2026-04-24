@@ -23,13 +23,14 @@ from scanner.scanner import (
 )
 from scanner.strategies.default  import STRATEGY as DEFAULT
 from scanner.strategies.gap_rvol import STRATEGY as GAP_RVOL
+from scanner.strategies.yahoo_ps import STRATEGY as YAHOO_PS
 
 warnings.filterwarnings("ignore")
 
 # ---------------------------------------------------------------------------
 # Strategy registry — add new strategies here
 # ---------------------------------------------------------------------------
-STRATEGIES: dict = {s["name"]: s for s in [DEFAULT, GAP_RVOL]}
+STRATEGIES: dict = {s["name"]: s for s in [DEFAULT, GAP_RVOL, YAHOO_PS]}
 
 # ---------------------------------------------------------------------------
 # CSS + theme
@@ -289,10 +290,17 @@ def render_sidebar(df, error_count: int, last_run: datetime) -> dict:
             lines.append(f"- Gap at open: **≥{strategy['gap_min']*100:.0f}%**")
         if strategy["min_volume"]:
             lines.append(f"- Min volume: **{strategy['min_volume']:,}**")
-        lines += [
-            f"- Mkt cap: **≥${strategy['mktcap_min']/1_000_000:.0f}M**",
-            f"- {strategy['rvol_label']}: **≥{strategy['rvol_min']}** ({strategy['rvol_method']})",
-        ]
+        mktcap_max = strategy.get("mktcap_max")
+        if mktcap_max is not None:
+            lines.append(
+                f"- Mkt cap: **${strategy['mktcap_min']/1_000_000:.0f}M – ${mktcap_max/1_000_000_000:.1f}B**"
+            )
+        else:
+            lines.append(f"- Mkt cap: **≥${strategy['mktcap_min']/1_000_000:.0f}M**")
+        if strategy["rvol_min"] is not None:
+            lines.append(
+                f"- {strategy['rvol_label']}: **≥{strategy['rvol_min']}** ({strategy['rvol_method']})"
+            )
         if strategy["vwap_filter"]:
             lines.append("- Price **< VWAP**")
         st.markdown("\n".join(lines))
