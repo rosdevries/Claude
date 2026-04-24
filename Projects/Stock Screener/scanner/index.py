@@ -126,7 +126,7 @@ def build_table_html(df, selected: str, strategy: dict) -> str:
             f"<td>${price:.2f}</td>"
             f'<td class="{pcls}">{psign}{pct:.1f}%</td>'
             f"<td>{int(vol):,}</td>"
-            f"<td>{rvol:.1f}</td>"
+            f"<td>{'—' if rvol is None else f'{rvol:.1f}'}</td>"
             f'<td class="pos">{vs_str}</td>'
             f'<td class="dim">{mktcap}</td>'
             f"</tr>"
