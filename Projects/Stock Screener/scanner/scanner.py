@@ -268,6 +268,89 @@ def compute_vwap(intraday_df):
         return None
 
 # ---------------------------------------------------------------------------
+# yfinance screener pipeline (used when strategy data_source == "yfinance_screener")
+# ---------------------------------------------------------------------------
+
+@st.cache_data(ttl=60)
+def _fetch_yf_screener(
+    price_min: float, price_max: float,
+    pct_change_min: float, min_volume: int,
+    mktcap_min: int, mktcap_max: int,
+) -> list:
+    import yfinance as yf
+    screener = yf.Screener()
+    screener.set_body({
+        "offset": 0,
+        "size": 250,
+        "sortField": "dayvolume",
+        "sortType": "desc",
+        "quoteType": "EQUITY",
+        "query": {
+            "operator": "and",
+            "operands": [
+                {"operator": "eq",   "operands": ["region", "us"]},
+                {"operator": "btwn", "operands": ["intradaymarketcap", mktcap_min, mktcap_max]},
+                {"operator": "btwn", "operands": ["lastsaleprice", price_min, price_max]},
+                {"operator": "gt",   "operands": ["dayvolume", min_volume]},
+                {"operator": "gt",   "operands": ["percentchange", pct_change_min * 100]},
+            ],
+        },
+    })
+    return screener.response.get("quotes", [])
+
+
+def run_pipeline_yf(strategy: dict) -> tuple:
+    """Screener pipeline that queries Yahoo Finance directly via yfinance."""
+    try:
+        quotes = _fetch_yf_screener(
+            price_min      = strategy["price_min"],
+            price_max      = strategy["price_max"],
+            pct_change_min = strategy["pct_change_min"],
+            min_volume     = strategy["min_volume"],
+            mktcap_min     = strategy["mktcap_min"],
+            mktcap_max     = strategy.get("mktcap_max", 10_000_000_000),
+        )
+    except Exception:
+        return _empty_df(strategy), 0
+
+    fsyms = [q.get("symbol", "") for q in quotes if q.get("symbol")]
+    intraday_bars = fetch_intraday_bars(tuple(fsyms)) if fsyms else {}
+
+    rvol_col = strategy["rvol_label"]
+    rows = []
+    for q in quotes:
+        try:
+            sym        = q.get("symbol", "")
+            price      = q.get("regularMarketPrice") or q.get("lastSalePrice")
+            prev_close = q.get("regularMarketPreviousClose")
+            volume     = q.get("regularMarketVolume") or q.get("dayVolume", 0)
+            mktcap     = q.get("marketCap", 0)
+            if not sym or not price or not prev_close:
+                continue
+            pct  = (price - prev_close) / prev_close
+            vwap = compute_vwap(intraday_bars.get(sym))
+            rows.append({
+                "Symbol":     sym,
+                "Prev Close": round(prev_close, 2),
+                "Last Price": round(price, 2),
+                "% Change":   round(pct * 100, 2),
+                "Volume":     int(volume),
+                rvol_col:     None,
+                "VWAP":       round(vwap, 2) if vwap is not None else None,
+                "vs VWAP":    round(price - vwap, 2) if vwap is not None else None,
+                "Market Cap": int(mktcap),
+            })
+        except Exception:
+            continue
+
+    if not rows:
+        return _empty_df(strategy), 0
+
+    df = pd.DataFrame(rows).sort_values("% Change", ascending=False).reset_index(drop=True)
+    return df, 0
+
+
+# ---------------------------------------------------------------------------
 # Pipeline
 # ---------------------------------------------------------------------------
 
@@ -279,6 +362,9 @@ def _empty_df(strategy: dict) -> pd.DataFrame:
 
 
 def run_pipeline(strategy: dict) -> tuple:
+    if strategy.get("data_source") == "yfinance_screener":
+        return run_pipeline_yf(strategy)
+
     universe     = fetch_universe()
     snapshots    = fetch_snapshots(tuple(universe))
     pre_filtered = filter_by_snapshot(snapshots, strategy)

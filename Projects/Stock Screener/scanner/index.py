@@ -255,7 +255,8 @@ def render_chart_panel(symbol: str, scan_df, strategy: dict) -> None:
         c2.metric("High",   f"${chart_df['high'].max():.2f}")
         c3.metric("Low",    f"${chart_df['low'].min():.2f}")
         c4.metric("Volume", f"{int(r['Volume']):,}")
-        c5.metric(rvol_col, f"{r[rvol_col]:.1f}")
+        rvol_val = r.get(rvol_col)
+        c5.metric(rvol_col, f"{rvol_val:.1f}" if rvol_val is not None else "—")
 
 
 def render_sidebar(df, error_count: int, last_run: datetime) -> dict:

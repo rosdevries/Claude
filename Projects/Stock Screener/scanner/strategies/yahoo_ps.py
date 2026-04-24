@@ -14,4 +14,5 @@ STRATEGY = {
     "rvol_project":   True,
     "vwap_filter":    False,
     "rvol_label":     "Rel Vol (σ)",
+    "data_source":    "yfinance_screener",
 }
