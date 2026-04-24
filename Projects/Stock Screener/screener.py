@@ -509,7 +509,7 @@ def render_chart_panel(symbol: str, scan_df: pd.DataFrame) -> None:
     hdr_col, close_col = st.columns([4, 1])
 
     with close_col:
-        if st.button("✕ Close", key="close_panel", use_container_width=True):
+        if st.button("✕ Close", key="close_panel", width="stretch"):
             st.query_params.clear()
             st.rerun()
 
@@ -543,7 +543,7 @@ def render_chart_panel(symbol: str, scan_df: pd.DataFrame) -> None:
 
     st.plotly_chart(
         build_candle_chart(chart_df),
-        use_container_width=True,
+        width="stretch",
         config={"displayModeBar": False},
     )
 
@@ -579,7 +579,7 @@ def render_sidebar(df: pd.DataFrame, error_count: int, last_run: datetime) -> No
         )
 
         st.divider()
-        if st.button("Refresh Now", use_container_width=True):
+        if st.button("Refresh Now", width="stretch"):
             st.cache_data.clear()
             st.rerun()
 
@@ -616,7 +616,7 @@ def main() -> None:
         st.caption("US Equities · Alpaca IEX · Auto-refreshes every 60 s")
     with btn_col:
         st.write("")
-        refresh_clicked = st.button("🔄 Refresh Scan", use_container_width=True)
+        refresh_clicked = st.button("🔄 Refresh Scan", width="stretch")
 
     if not is_market_open():
         st.warning(
