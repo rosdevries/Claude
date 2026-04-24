@@ -13,4 +13,5 @@ STRATEGY = {
     "rvol_project":   True,    # project partial-day volume to full-day equivalent
     "vwap_filter":    True,    # only pass stocks trading below VWAP
     "rvol_label":     "Rel Vol (σ)",
+    "data_source":    "yfinance_screener",
 }

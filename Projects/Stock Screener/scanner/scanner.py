@@ -274,38 +274,63 @@ def compute_vwap(intraday_df):
 @st.cache_data(ttl=60)
 def _fetch_yf_screener(
     price_min: float, price_max: float,
-    pct_change_min: float, min_volume: int,
+    pct_min: float,
+    min_volume,           # may be None
     mktcap_min: int, mktcap_max: int,
 ) -> list:
     from yfinance import EquityQuery
     import yfinance as yf
-    q = EquityQuery('and', [
+    operands = [
         EquityQuery('eq',   ['region', 'us']),
         EquityQuery('btwn', ['intradaymarketcap', mktcap_min, mktcap_max]),
-        EquityQuery('btwn', ['intradayprice',     price_min,  price_max]),
-        EquityQuery('gt',   ['dayvolume',         min_volume]),
-        EquityQuery('gt',   ['percentchange',     pct_change_min * 100]),
-    ])
-    result = yf.screen(q, sortField='dayvolume', sortAsc=False)
+        EquityQuery('btwn', ['intradayprice', price_min, price_max]),
+        EquityQuery('gt',   ['percentchange', pct_min * 100]),
+    ]
+    if min_volume:
+        operands.append(EquityQuery('gt', ['dayvolume', min_volume]))
+    result = yf.screen(EquityQuery('and', operands), sortField='dayvolume', sortAsc=False)
     return result.get('quotes', [])
 
 
+@st.cache_data(ttl=60)
+def fetch_daily_bars_yf(symbols: tuple) -> dict:
+    import yfinance as yf
+    if not symbols:
+        return {}
+    result = {}
+    raw = yf.download(list(symbols), period="3mo", interval="1d",
+                      auto_adjust=True, progress=False)
+    for sym in symbols:
+        try:
+            df = raw.xs(sym, level=1, axis=1) if isinstance(raw.columns, pd.MultiIndex) else raw.copy()
+            df = df.dropna(subset=["Volume"]).rename(columns={"Volume": "volume"})
+            result[sym] = df
+        except Exception:
+            pass
+    return result
+
+
 def run_pipeline_yf(strategy: dict) -> tuple:
-    """Screener pipeline that queries Yahoo Finance directly via yfinance."""
+    pct_min = strategy["pct_change_min"] or strategy.get("gap_min", 0)
     try:
         quotes = _fetch_yf_screener(
-            price_min      = strategy["price_min"],
-            price_max      = strategy["price_max"],
-            pct_change_min = strategy["pct_change_min"],
-            min_volume     = strategy["min_volume"],
-            mktcap_min     = strategy["mktcap_min"],
-            mktcap_max     = strategy.get("mktcap_max", 10_000_000_000),
+            price_min  = strategy["price_min"],
+            price_max  = strategy["price_max"],
+            pct_min    = pct_min,
+            min_volume = strategy["min_volume"],
+            mktcap_min = strategy["mktcap_min"],
+            mktcap_max = strategy.get("mktcap_max", 10_000_000_000),
         )
     except Exception:
         return _empty_df(strategy), 0
 
-    fsyms = [q.get("symbol", "") for q in quotes if q.get("symbol")]
-    intraday_bars = fetch_intraday_bars(tuple(fsyms)) if fsyms else {}
+    fsyms = [q.get("symbol") for q in quotes if q.get("symbol")]
+    if not fsyms:
+        return _empty_df(strategy), 0
+
+    rvol_min      = strategy["rvol_min"]
+    daily_bars_yf = fetch_daily_bars_yf(tuple(fsyms)) if rvol_min is not None else {}
+    intraday_bars = fetch_intraday_bars(tuple(fsyms))
 
     rvol_col = strategy["rvol_label"]
     rows = []
@@ -316,17 +341,31 @@ def run_pipeline_yf(strategy: dict) -> tuple:
             prev_close = q.get("regularMarketPreviousClose")
             volume     = q.get("regularMarketVolume", 0)
             mktcap     = q.get("marketCap", 0)
-            pct        = q.get("regularMarketChangePercent", 0)  # already in %, e.g. 15.5
+            pct        = q.get("regularMarketChangePercent", 0)
             if not sym or not price or not prev_close:
                 continue
+
+            if rvol_min is not None:
+                d_df = daily_bars_yf.get(sym)
+                if d_df is None or d_df.empty:
+                    continue
+                rvol = compute_relative_volume(d_df, volume, strategy)
+                if rvol is None or rvol < rvol_min:
+                    continue
+            else:
+                rvol = None
+
             vwap = compute_vwap(intraday_bars.get(sym))
+            if strategy["vwap_filter"] and (vwap is None or price >= vwap):
+                continue
+
             rows.append({
                 "Symbol":     sym,
                 "Prev Close": round(prev_close, 2),
                 "Last Price": round(price, 2),
                 "% Change":   round(pct, 2),
                 "Volume":     int(volume),
-                rvol_col:     None,
+                rvol_col:     round(rvol, 1) if rvol is not None else None,
                 "VWAP":       round(vwap, 2) if vwap is not None else None,
                 "vs VWAP":    round(price - vwap, 2) if vwap is not None else None,
                 "Market Cap": int(mktcap),
@@ -336,7 +375,6 @@ def run_pipeline_yf(strategy: dict) -> tuple:
 
     if not rows:
         return _empty_df(strategy), 0
-
     df = pd.DataFrame(rows).sort_values("% Change", ascending=False).reset_index(drop=True)
     return df, 0
 

@@ -22,4 +22,5 @@ STRATEGY = {
     "rvol_project":   False,         # ThinkScript uses raw todayVolume; no projection
     "vwap_filter":    False,         # not in ThinkScript; VWAP still computed for display
     "rvol_label":     "Rel Vol (×)",
+    "data_source":    "yfinance_screener",
 }
