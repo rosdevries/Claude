@@ -223,7 +223,7 @@ def compute_relative_volume(daily_df: pd.DataFrame, snapshot_volume: int, strate
         lookback = strategy["rvol_lookback"]
         df       = daily_df.sort_index()
         idx      = df.index
-        dates    = idx.tz_convert(ET).date if idx.tz else pd.to_datetime(idx).dt.date.values
+        dates    = idx.tz_convert(ET).date if idx.tz else pd.to_datetime(idx).date
         today_et = datetime.now(tz=ET).date()
         hist     = df[dates != today_et]
 
