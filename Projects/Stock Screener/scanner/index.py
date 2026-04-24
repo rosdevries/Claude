@@ -1,11 +1,13 @@
+import os
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import warnings
-from datetime import datetime
+from datetime import datetime, time
 from urllib.parse import quote_plus
 
+import anthropic
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import streamlit as st
@@ -26,6 +28,69 @@ from scanner.strategies.gap_rvol import STRATEGY as GAP_RVOL
 from scanner.strategies.yahoo_ps import STRATEGY as YAHOO_PS
 
 warnings.filterwarnings("ignore")
+
+# ---------------------------------------------------------------------------
+# Anthropic / Stupidog
+# ---------------------------------------------------------------------------
+_anthropic_key    = os.environ.get("ANTHROPIC_API_KEY", "")
+_anthropic_client = anthropic.Anthropic(api_key=_anthropic_key) if _anthropic_key else None
+
+_STUPIDOG_SYSTEM = (
+    "You are Stupidog — a happy, tail-wagging day-trading dog with razor-sharp market instincts. "
+    "You speak in first person as an enthusiastic dog who loves trading. You are lighthearted and "
+    "playful, but your trading advice is concise, specific, and genuinely educational. Your goal "
+    "is to teach the user what a good momentum setup looks like: what makes an entry compelling, "
+    "where a sensible stop-loss sits, and what an exit target could be. If there are no good "
+    "setups right now, say so plainly and explain why the current results aren't worth chasing. "
+    "Never make up tickers. Only discuss stocks from the data provided."
+)
+
+
+def is_stupidog_active() -> bool:
+    now = datetime.now(tz=ET)
+    return now.weekday() < 5 and time(9, 30) <= now.time() <= time(10, 30)
+
+
+def get_stupidog_advice(results: dict) -> str:
+    if _anthropic_client is None:
+        return "*(ANTHROPIC_API_KEY not set — Stupidog is napping.)*"
+
+    sections = []
+    for name, df in results.items():
+        if df.empty:
+            sections.append(f"**{name}**: no stocks passing right now")
+        else:
+            cols = ["Symbol", "Last Price", "% Change", "Volume", "Rel Vol (σ)", "vs VWAP"]
+            cols = [c for c in cols if c in df.columns]
+            sections.append(
+                f"**{name}** ({len(df)} stocks):\n"
+                + df[cols].head(8).to_string(index=False)
+            )
+
+    now_str = datetime.now(tz=ET).strftime("%I:%M %p ET")
+    user_prompt = (
+        f"It is {now_str}. Here are the stocks passing each momentum screener:\n\n"
+        + "\n\n".join(sections)
+        + "\n\n"
+        "Please:\n"
+        "1. Identify the 1–3 highest-conviction setups (or say there are none if that's true).\n"
+        "2. For each setup: name the stock, flag any likely overnight catalyst (earnings, "
+        "funding, partnership, FDA, etc.) if the move suggests one, explain what makes the "
+        "entry compelling right now, suggest a logical stop-loss level, and give a rough "
+        "profit target or exit signal to watch for.\n"
+        "3. Keep the total response under 200 words. Be punchy and educational."
+    )
+
+    try:
+        msg = _anthropic_client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=400,
+            system=_STUPIDOG_SYSTEM,
+            messages=[{"role": "user", "content": user_prompt}],
+        )
+        return msg.content[0].text
+    except Exception as e:
+        return f"*(Stupidog hit a snag: {e})*"
 
 # ---------------------------------------------------------------------------
 # Strategy registry — add new strategies here
@@ -339,6 +404,8 @@ def main() -> None:
         ("last_refresh_count", -1),
         ("last_scan_time",     None),
         ("prev_strategy",      None),
+        ("stupidog_advice",    None),
+        ("stupidog_last_run",  None),
     ]:
         if key not in st.session_state:
             st.session_state[key] = default
@@ -387,6 +454,17 @@ def main() -> None:
         st.session_state.scan_error_count = ec
         st.session_state.last_scan_time   = datetime.now(tz=ET)
 
+    # Stupidog: runs all 3 pipelines every 5 min between 9:30–10:30 ET
+    five_min_elapsed = (
+        st.session_state.stupidog_last_run is None
+        or (datetime.now(tz=ET) - st.session_state.stupidog_last_run).total_seconds() >= 300
+    )
+    if is_stupidog_active() and five_min_elapsed:
+        with st.spinner("Stupidog is sniffing the market…"):
+            all_results = {s["name"]: run_pipeline(s)[0] for s in STRATEGIES.values()}
+            st.session_state.stupidog_advice   = get_stupidog_advice(all_results)
+            st.session_state.stupidog_last_run = datetime.now(tz=ET)
+
     df       = st.session_state.scan_results if st.session_state.scan_results is not None else _empty_df(strategy)
     ec       = st.session_state.scan_error_count
     last_run = st.session_state.last_scan_time or datetime.now(tz=ET)
@@ -406,6 +484,18 @@ def main() -> None:
         st.markdown(build_table_html(df, None, strategy), unsafe_allow_html=True)
         if not df.empty:
             st.caption("↑ Click a symbol to open the intraday chart panel")
+
+    # Stupidog commentary
+    if st.session_state.stupidog_advice:
+        st.divider()
+        last = st.session_state.stupidog_last_run
+        ts   = last.strftime("%I:%M %p ET") if last else ""
+        st.markdown(
+            f"**🐶 Stupidog says…** "
+            f"<span style='color:#7a8ba0; font-size:0.8em'>({ts})</span>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(st.session_state.stupidog_advice)
 
 
 if __name__ == "__main__":
