@@ -67,7 +67,7 @@ def main():
     markdown, html = format_brief(today, headlines, picks, tldr, portfolio)
 
     try:
-        commit_summary(today, markdown)
+        commit_summary(today, markdown, html)
         log.info("GitHub commit succeeded")
     except Exception as e:
         log.warning("GitHub commit failed (non-fatal): %s", e)

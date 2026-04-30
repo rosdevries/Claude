@@ -1,0 +1,46 @@
+name: Send Daily Market Brief Email
+
+on:
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "Brief date (YYYY-MM-DD)"
+        required: true
+        type: string
+
+jobs:
+  send-email:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Send email via Gmail SMTP
+        run: |
+          python3 - <<'EOF'
+          import smtplib, ssl, os
+          from email.mime.multipart import MIMEMultipart
+          from email.mime.text import MIMEText
+
+          date = "${{ inputs.date }}"
+          with open(f"summaries/{date}.md", encoding="utf-8") as f:
+              plaintext = f.read()
+          html_path = f"summaries/{date}.html"
+          html = open(html_path, encoding="utf-8").read() if os.path.exists(html_path) else f"<pre>{plaintext}</pre>"
+
+          user = "${{ secrets.GMAIL_USER }}"
+          password = "${{ secrets.GMAIL_APP_PASSWORD }}"
+          to_addr = "${{ secrets.EMAIL_TO }}"
+
+          msg = MIMEMultipart("alternative")
+          msg["Subject"] = f"Daily Market Brief — {date}"
+          msg["From"] = user
+          msg["To"] = to_addr
+          msg.attach(MIMEText(plaintext, "plain"))
+          msg.attach(MIMEText(html, "html"))
+
+          context = ssl.create_default_context()
+          with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
+              server.login(user, password)
+              server.sendmail(user, to_addr, msg.as_string())
+          print("Email sent")
+          EOF

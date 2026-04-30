@@ -7,7 +7,9 @@ def fetch_holdings() -> dict:
     password = os.environ["DOLLARYDOO_PASSWORD"]
     auth = ("", password)
 
-    summary = requests.get(f"{url}/api/portfolio/summary", auth=auth, timeout=15).json()
-    holdings = requests.get(f"{url}/api/portfolio/holdings", auth=auth, timeout=15).json()
+    summary_resp = requests.get(f"{url}/api/portfolio/summary", auth=auth, timeout=15)
+    summary_resp.raise_for_status()
+    holdings_resp = requests.get(f"{url}/api/portfolio/holdings", auth=auth, timeout=15)
+    holdings_resp.raise_for_status()
 
-    return {"summary": summary, "holdings": holdings}
+    return {"summary": summary_resp.json(), "holdings": holdings_resp.json()}
