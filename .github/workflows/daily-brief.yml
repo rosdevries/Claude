@@ -2,8 +2,8 @@ name: Daily Market Brief
 
 on:
   schedule:
-    # 15:00 UTC = 8am PDT (UTC-7). Shifts to 7am in winter — change to 16:00 for year-round 8am PST.
-    - cron: '0 15 * * 1-5'
+    # 13:17 UTC = 6:17am PDT (UTC-7). Shifts to 5:17am in winter (PST).
+    - cron: '17 13 * * 1-5'
   workflow_dispatch:  # allows manual trigger from the Actions tab
 
 permissions:
