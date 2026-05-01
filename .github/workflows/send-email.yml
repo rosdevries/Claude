@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Stage HTML for email
-        run: cp "Projects/Daily Market Brief/summaries/${{ inputs.date }}.html" /tmp/brief.html
+        run: cp "summaries/${{ inputs.date }}.html" /tmp/brief.html
 
       - name: Send email
         uses: dawidd6/action-send-mail@v3

@@ -62,17 +62,9 @@ def _call_with_retry(system: str, prompt: str, max_retries: int = 3) -> list:
         try:
             text = _run(system, prompt)
             return parse_json_list(text)
-        except (json.JSONDecodeError, ValueError, Exception) as e:
+        except Exception as e:
             last_exc = e
     raise RuntimeError(f"All {max_retries} attempts failed: {last_exc}") from last_exc
-
-
-def fetch_headlines() -> list:
-    return _call_with_retry(
-        HEADLINES_SYSTEM,
-        "Search for the top 10 US financial and market headlines from the last 24 hours. "
-        "Return ONLY a JSON array.",
-    )
 
 
 def fetch_stock_picks() -> list:

@@ -93,14 +93,6 @@ def _call_with_retry(system_text: str, user_prompt: str, max_retries: int = 3) -
     raise RuntimeError(f"All {max_retries} attempts failed: {last_exc}") from last_exc
 
 
-def fetch_headlines() -> list:
-    return _call_with_retry(
-        HEADLINES_SYSTEM,
-        "Search for the top 10 US financial and market headlines from the last 24 hours. "
-        "Return ONLY a JSON array.",
-    )
-
-
 def fetch_stock_picks() -> list:
     return _call_with_retry(
         STOCK_PICKS_SYSTEM,
