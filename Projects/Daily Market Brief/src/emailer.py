@@ -46,7 +46,7 @@ def _send_smtp(date: str, html: str, plaintext: str, subject: str = None) -> Non
         for addr in socket.getaddrinfo("smtp.gmail.com", 465, socket.AF_INET, socket.SOCK_STREAM)
     )
     context = ssl.create_default_context()
-    with smtplib.SMTP_SSL(ipv4, 465, context=context, timeout=15) as server:
+    with smtplib.SMTP_SSL(ipv4, 465, context=context, timeout=15, server_hostname="smtp.gmail.com") as server:
         server.login(user, password)
         server.sendmail(user, to_addr, msg.as_string())
 
