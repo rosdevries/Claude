@@ -1,3 +1,4 @@
+import logging
 import os
 import smtplib
 import socket
@@ -8,6 +9,7 @@ from email.mime.text import MIMEText
 
 import requests
 
+log = logging.getLogger(__name__)
 GITHUB_API = "https://api.github.com"
 
 
@@ -19,6 +21,7 @@ def send_email(date: str, html: str, plaintext: str, subject: str = None) -> Non
         return
     except Exception as e:
         smtp_err = e
+        log.warning("SMTP failed (%s: %s) — falling back to GitHub Actions", type(e).__name__, e)
 
     _send_via_github_actions(date, smtp_err)
 

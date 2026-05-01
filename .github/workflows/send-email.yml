@@ -1,0 +1,28 @@
+name: Send Daily Market Brief Email
+
+on:
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'Brief date (YYYY-MM-DD)'
+        required: true
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Send email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.GMAIL_USER }}
+          password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          subject: "Daily Market Brief — ${{ inputs.date }}"
+          to: ${{ secrets.EMAIL_TO }}
+          from: Daily Market Brief <${{ secrets.GMAIL_USER }}>
+          html_body: file://Projects/Daily Market Brief/summaries/${{ inputs.date }}.html

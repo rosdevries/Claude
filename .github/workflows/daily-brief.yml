@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write  # lets GITHUB_TOKEN commit summaries via github_store.py
+  actions: write   # lets GITHUB_TOKEN dispatch send-email.yml as SMTP fallback
 
 jobs:
   brief:
