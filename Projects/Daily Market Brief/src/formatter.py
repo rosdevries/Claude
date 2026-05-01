@@ -156,7 +156,7 @@ def _build_portfolio_html(portfolio: dict) -> str:
     <div style="height:8px;background:#f3f4f6;"></div>"""
 
 
-def _build_html(date: str, headlines: List[dict], stock_picks: List[dict], tldr: str = "", portfolio: dict = None) -> str:
+def _build_html(date: str, headlines: list[dict], stock_picks: list[dict], tldr: str = "", portfolio: dict = None) -> str:
     headline_rows = ""
     for i, h in enumerate(headlines, 1):
         url = h.get("url", "#")
