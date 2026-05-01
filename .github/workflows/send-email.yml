@@ -14,6 +14,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Stage HTML for email
+        run: cp "Projects/Daily Market Brief/summaries/${{ inputs.date }}.html" /tmp/brief.html
+
       - name: Send email
         uses: dawidd6/action-send-mail@v3
         with:
@@ -25,4 +28,4 @@ jobs:
           subject: "Daily Market Brief — ${{ inputs.date }}"
           to: ${{ secrets.EMAIL_TO }}
           from: Daily Market Brief <${{ secrets.GMAIL_USER }}>
-          html_body: file://Projects/Daily Market Brief/summaries/${{ inputs.date }}.html
+          html_body: file:///tmp/brief.html
