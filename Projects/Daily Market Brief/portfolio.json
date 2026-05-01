@@ -1,5 +1,11 @@
 [
   {
+    "symbol": "XLE",
+    "shares": 15.0,
+    "buy_price": 59.029998779296875,
+    "buy_date": "2026-04-29"
+  },
+  {
     "symbol": "AAPL",
     "shares": 2.0,
     "buy_price": 271.3500061035156,
