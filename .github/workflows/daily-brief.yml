@@ -1,0 +1,40 @@
+name: Daily Market Brief
+
+on:
+  schedule:
+    # 15:00 UTC = 8am PDT (UTC-7). Shifts to 7am in winter — change to 16:00 for year-round 8am PST.
+    - cron: '0 15 * * 1-5'
+  workflow_dispatch:  # allows manual trigger from the Actions tab
+
+permissions:
+  contents: write  # lets GITHUB_TOKEN commit summaries via github_store.py
+
+jobs:
+  brief:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: "Projects/Daily Market Brief"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: "Projects/Daily Market Brief/requirements.txt"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run daily brief
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPO: ${{ github.repository }}
+          DOLLARYDOO_PASSWORD: ${{ secrets.DOLLARYDOO_PASSWORD }}
+        run: python main.py
