@@ -1,0 +1,45 @@
+name: Daily ON24 Webinar Email
+
+on:
+  schedule:
+    # 06:00 UTC = 11pm PDT (UTC-7). Shifts to 10pm PST (UTC-8) in winter — adjust to 07:00 if preferred.
+    - cron: '0 6 * * 1-5'
+  workflow_dispatch:  # allows manual trigger from the Actions tab for testing
+
+jobs:
+  send-report:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r "Projects/ON24 Webinars/requirements.txt"
+
+      - name: Get today's date
+        id: date
+        run: echo "today=$(date +'%Y-%m-%d')" >> "$GITHUB_OUTPUT"
+
+      - name: Generate HTML report
+        env:
+          ON24_TOKEN_KEY: ${{ secrets.ON24_TOKEN_KEY }}
+          ON24_TOKEN_SECRET: ${{ secrets.ON24_TOKEN_SECRET }}
+        working-directory: "Projects/ON24 Webinars"
+        run: python main.py --html > report.html
+
+      - name: Send email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "ON24 Webinar Report — ${{ steps.date.outputs.today }}"
+          to: rosanne.de-vries@siemens.com
+          from: ON24 Webinar Report <${{ secrets.MAIL_USERNAME }}>
+          html_body: file://Projects/ON24 Webinars/report.html
