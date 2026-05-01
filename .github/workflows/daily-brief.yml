@@ -10,6 +10,9 @@ permissions:
   contents: write  # lets GITHUB_TOKEN commit summaries via github_store.py
   actions: write   # lets GITHUB_TOKEN dispatch send-email.yml as SMTP fallback
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   brief:
     runs-on: ubuntu-latest
