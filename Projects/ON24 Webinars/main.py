@@ -85,6 +85,7 @@ def build_row(event, matching_tags):
     return {
         "eventid": event.get("eventid"),
         "title": event.get("description") or "Untitled",
+        "audienceurl": event.get("audienceurl", ""),
         "livestart": format_date(event.get("livestart")),
         "archiveend": format_date(event.get("archiveend")),
         "tags": sorted(matching_tags),
@@ -96,13 +97,16 @@ def collect_events():
     now = datetime.now(timezone.utc)
     today = now.strftime("%Y-%m-%d")
     future = (now + timedelta(days=LOOKAHEAD_DAYS)).strftime("%Y-%m-%d")
+    lookback = (now - timedelta(days=ONDEMAND_LOOKBACK_DAYS)).strftime("%Y-%m-%d")
 
     seen_ids = set()
     all_events = []
 
     for extra in [
+        # Upcoming: livestart between today and 6 months out
         {"dateFilterMode": "livestart", "startDate": today, "endDate": future},
-        {"dateFilterMode": "archiveend", "startDate": today, "endDate": future},
+        # On-demand candidates: livestart in the past 30 days
+        {"dateFilterMode": "livestart", "startDate": lookback, "endDate": today},
     ]:
         for e in fetch_events_paginated(EVENT_CLIENT_ID, extra):
             eid = e.get("eventid")
@@ -149,18 +153,26 @@ def print_section(title, rows, date_label, date_key):
 
 # ── HTML output (for email) ────────────────────────────────────────────────────
 
-def _table_html(section_title, rows, date_label, date_key, header_color):
+def _table_html(section_title, rows, date_label, date_key, header_color, link_titles=False):
     if rows:
         body_rows = ""
         for i, w in enumerate(rows):
             bg = "#ffffff" if i % 2 == 0 else "#f5f7fa"
             tags_str = ", ".join(w["tags"])
+            url = w.get("audienceurl", "")
+            if link_titles and url:
+                title_cell = (
+                    f'<a href="{url}" style="color:{header_color};text-decoration:none;font-weight:500">'
+                    f'{w["title"]}</a>'
+                )
+            else:
+                title_cell = w["title"]
             body_rows += (
                 f'<tr style="background:{bg}">'
                 f'<td style="padding:8px 12px;border-bottom:1px solid #e0e0e0">{w["eventid"]}</td>'
                 f'<td style="padding:8px 12px;border-bottom:1px solid #e0e0e0;white-space:nowrap">{w[date_key]}</td>'
                 f'<td style="padding:8px 12px;border-bottom:1px solid #e0e0e0">{tags_str}</td>'
-                f'<td style="padding:8px 12px;border-bottom:1px solid #e0e0e0">{w["title"]}</td>'
+                f'<td style="padding:8px 12px;border-bottom:1px solid #e0e0e0">{title_cell}</td>'
                 f'</tr>'
             )
     else:
@@ -184,7 +196,7 @@ def _table_html(section_title, rows, date_label, date_key, header_color):
 def render_html(upcoming, ondemand):
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     tags_display = " | ".join(sorted(TARGET_TAGS))
-    upcoming_html = _table_html("Upcoming Live", upcoming, "Live Start", "livestart", "#1a6b3c")
+    upcoming_html = _table_html("Upcoming Live", upcoming, "Live Start", "livestart", "#1a6b3c", link_titles=True)
     ondemand_html = _table_html(
         f"On Demand (last {ONDEMAND_LOOKBACK_DAYS} days)", ondemand, "Live Date", "livestart", "#1a4b8c"
     )
